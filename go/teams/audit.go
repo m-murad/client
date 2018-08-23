@@ -12,11 +12,13 @@ import (
 type AuditParams struct {
 	RootFreshness         time.Duration
 	MerkleMovementTrigger keybase1.Seqno
+	NumPreProbes          int
 }
 
 var params = AuditParams{
 	RootFreshness:         time.Minute,
 	MerkleMovementTrigger: keybase1.Seqno(1000),
+	NumPreProbes:          25,
 }
 
 type Auditor struct {
@@ -126,6 +128,30 @@ func lastAudit(h *keybase1.AuditHistory) *keybase1.Audit {
 	return &ret
 }
 
+func makeHistory(history *keybase1.AuditHistory, id keybase1.TeamID) *keybase1.AuditHistory {
+	if history == nil {
+		return &keybase1.AuditHistory{
+			ID:         id,
+			Public:     id.IsPublic(),
+			PreProbes:  make(map[keybase1.Seqno]int),
+			PostProbes: make(map[keybase1.Seqno]int),
+		}
+	}
+	ret := history.DeepCopy()
+	return &ret
+}
+
+func (a *Auditor) doPreProbes(m libkb.MetaContext, history *keybase1.AuditHistory, headMerkle keybase1.MerkleRootV2) (err error) {
+	first := m.G().MerkleClient.FirstSeqnoWithSkips()
+	if first == nil {
+		return NewAuditError("cannot find a first modern merkle sequence")
+	}
+	for len(history.PreProbes) < params.NumPreProbes {
+
+	}
+	return nil
+}
+
 func (a *Auditor) auditLocked(m libkb.MetaContext, id keybase1.TeamID, headMerkle keybase1.MerkleRootV2, chain map[keybase1.Seqno]keybase1.LinkID, maxChainSeqno keybase1.Seqno) (err error) {
 
 	defer m.CTrace(fmt.Sprintf("Auditor#auditLocked(%v)", id), func() error { return err })()
@@ -151,6 +177,13 @@ func (a *Auditor) auditLocked(m libkb.MetaContext, id keybase1.TeamID, headMerkl
 	if history != nil && a.checkRecent(m, history, root) {
 		m.CDebugf("cached audit was recent; short-circuiting")
 		return nil
+	}
+
+	history = makeHistory(history, id)
+
+	err = a.doPreProbes(m, history, headMerkle)
+	if err != nil {
+		return err
 	}
 
 	err = a.putToCache(m, id, lru, history)
