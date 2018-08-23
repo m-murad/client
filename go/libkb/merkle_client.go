@@ -584,6 +584,18 @@ func (mc *MerkleClient) FetchRootFromServerBySeqno(m MetaContext, lowerBound key
 	return mc.fetchRootFromServer(m, root)
 }
 
+func (mc *MerkleClient) FetchRootFromServerByFreshness(m MetaContext, d time.Duration) (mr *MerkleRoot, err error) {
+	defer m.CVTrace(VLog0, "MerkleClient#FetchRootFromServerBySeqno", func() error { return err })()
+	root := mc.LastRoot()
+	now := m.G().Clock().Now()
+	if root != nil && now.Sub(root.fetched) >= d {
+		m.VLogf(VLog0, "fetched at=%v, and was current enough, so returning non-nil previously fetched root", root.fetched)
+		return root, nil
+	}
+	return mc.fetchRootFromServer(m, root)
+}
+
+
 func (mc *MerkleClient) FetchRootFromServer(m MetaContext, freshness time.Duration) (mr *MerkleRoot, err error) {
 	defer m.CVTrace(VLog0, "MerkleClient#FetchRootFromServer", func() error { return err })()
 	root := mc.LastRoot()

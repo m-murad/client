@@ -827,12 +827,14 @@ func (o FastTeamSigChainState) DeepCopy() FastTeamSigChainState {
 type Audit struct {
 	Time           Time  `codec:"time" json:"time"`
 	MaxMerkleSeqno Seqno `codec:"maxMerkleSeqno" json:"maxMerkleSeqno"`
+	MaxChainSeqno  Seqno `codec:"maxChainSeqno" json:"maxChainSeqno"`
 }
 
 func (o Audit) DeepCopy() Audit {
 	return Audit{
 		Time:           o.Time.DeepCopy(),
 		MaxMerkleSeqno: o.MaxMerkleSeqno.DeepCopy(),
+		MaxChainSeqno:  o.MaxChainSeqno.DeepCopy(),
 	}
 }
 

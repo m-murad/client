@@ -648,6 +648,10 @@
         {
           "type": "Seqno",
           "name": "maxMerkleSeqno"
+        },
+        {
+          "type": "Seqno",
+          "name": "maxChainSeqno"
         }
       ]
     },

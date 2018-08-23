@@ -274,6 +274,7 @@ protocol teams {
   record Audit {
     Time time;
     Seqno maxMerkleSeqno;
+    Seqno maxChainSeqno;
   }
 
   record AuditHistory {
