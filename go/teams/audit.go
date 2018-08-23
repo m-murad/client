@@ -45,12 +45,45 @@ func (a *Auditor) getLRU() *lru.Cache {
 	return a.lru
 }
 
+func (a *Auditor) getFromLRU(m libkb.MetaContext, id keybase1.TeamID, lru *lru.Cache) *keybase1.AuditHistory {
+	tmp, found := lru.Get(id)
+	if !found {
+		return nil
+	}
+	ret, ok := tmp.(*keybase1.AuditHistory)
+	if !ok {
+		m.CErrorf("Bad type assertion in Auditor#getFromLRU")
+		return nil
+	}
+	return ret
+}
+
+func (a *Auditor) getFromDisk(m libkb.MetaContext, id keybase1.TeamID) (*keybase1.AuditHistory, error) {
+	var ret keybase1.AuditHistory
+	found, err := m.G().LocalDb.GetInto(&ret, libkb.DbKey{Typ: libkb.DBTeamAuditor, Key: string(id)})
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, nil
+	}
+	return &ret, nil
+}
+
 func (a *Auditor) getFromCache(m libkb.MetaContext, id keybase1.TeamID, lru *lru.Cache) (*keybase1.AuditHistory, error) {
-	return nil, nil
+
+	ret := a.getFromLRU(m, id, lru)
+	if ret != nil {
+		return ret, nil
+	}
+	ret, err := a.getFromDisk(m, id)
+	return ret, err
 }
 
 func (a *Auditor) putToCache(m libkb.MetaContext, id keybase1.TeamID, lru *lru.Cache, h *keybase1.AuditHistory) (err error) {
-	return nil
+	lru.Add(id, h)
+	err = m.G().LocalDb.PutObj(libkb.DbKey{Typ: libkb.DBTeamAuditor, Key: string(id)}, nil, *h)
+	return err
 }
 
 func (a *Auditor) auditLocked(m libkb.MetaContext, id keybase1.TeamID, headMerkle keybase1.MerkleRootV2, chain map[keybase1.Seqno]keybase1.LinkID) (err error) {
