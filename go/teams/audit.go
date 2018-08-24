@@ -141,12 +141,17 @@ func makeHistory(history *keybase1.AuditHistory, id keybase1.TeamID) *keybase1.A
 	return &ret
 }
 
-func (a *Auditor) doPreProbes(m libkb.MetaContext, history *keybase1.AuditHistory, headMerkle keybase1.MerkleRootV2) (err error) {
+func (a *Auditor) doPreProbes(m libkb.MetaContext, history *keybase1.AuditHistory, probeId int, headMerkle keybase1.MerkleRootV2) (err error) {
 	first := m.G().MerkleClient.FirstSeqnoWithSkips()
 	if first == nil {
 		return NewAuditError("cannot find a first modern merkle sequence")
 	}
-	for len(history.PreProbes) < params.NumPreProbes {
+
+	return a.doProbes(m, history.PreProbes, probeId, *first, headMerkle.Seqno, params.NumPreProbes)
+}
+
+func (a *Auditor) doProbes(m libkb.MetaContext, probes map[keybase1.Seqno]int, probeId int, left keybase1.Seqno, right keybase1.Seqno, n int) (err error) {
+	for len(probes) < n {
 
 	}
 	return nil
@@ -181,7 +186,9 @@ func (a *Auditor) auditLocked(m libkb.MetaContext, id keybase1.TeamID, headMerkl
 
 	history = makeHistory(history, id)
 
-	err = a.doPreProbes(m, history, headMerkle)
+	newAuditIndex := len(history.Audits)
+
+	err = a.doPreProbes(m, history, newAuditIndex, headMerkle)
 	if err != nil {
 		return err
 	}
