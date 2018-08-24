@@ -7,6 +7,7 @@ import (
 	"github.com/keybase/client/go/libkb"
 	"github.com/keybase/client/go/protocol/keybase1"
 	"math/big"
+	"sort"
 	"sync"
 	"time"
 )
@@ -183,7 +184,7 @@ func (a *Auditor) doProbes(m libkb.MetaContext, probes map[keybase1.Seqno]int, p
 		m.CDebugf("no more probes needed; did %d, wanted %d", len(probes), n)
 		return nil, nil
 	}
-	rng := right - left
+	rng := right - left + 1
 	if int(rng) <= len(probes) {
 		m.CDebugf("no more probes needed; range was only %d, and we did %d", rng, len(probes))
 		return nil, nil
@@ -198,6 +199,9 @@ func (a *Auditor) doProbes(m libkb.MetaContext, probes map[keybase1.Seqno]int, p
 			probes[x] = probeId
 		}
 	}
+	sort.SliceStable(ret, func(i, j int) bool {
+		return ret[i].merkle < ret[j].merkle
+	})
 	return ret, nil
 }
 
