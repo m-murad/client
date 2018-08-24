@@ -1,10 +1,12 @@
 package teams
 
 import (
+	"crypto/rand"
 	"fmt"
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/keybase/client/go/libkb"
 	"github.com/keybase/client/go/protocol/keybase1"
+	"math/big"
 	"sync"
 	"time"
 )
@@ -142,19 +144,61 @@ func makeHistory(history *keybase1.AuditHistory, id keybase1.TeamID) *keybase1.A
 }
 
 func (a *Auditor) doPreProbes(m libkb.MetaContext, history *keybase1.AuditHistory, probeId int, headMerkle keybase1.MerkleRootV2) (err error) {
+	defer m.CTrace("Auditor#doPreProbes", func() error { return err })()
+
 	first := m.G().MerkleClient.FirstSeqnoWithSkips()
 	if first == nil {
 		return NewAuditError("cannot find a first modern merkle sequence")
 	}
 
-	return a.doProbes(m, history.PreProbes, probeId, *first, headMerkle.Seqno, params.NumPreProbes)
+	probePairs, err := a.doProbes(m, history.PreProbes, probeId, *first, headMerkle.Seqno, params.NumPreProbes)
+	if err != nil {
+		return err
+	}
+	if len(probePairs) == 0 {
+		m.CDebugf("No probe pairs, so bailing")
+		return nil
+	}
+
+	return nil
 }
 
-func (a *Auditor) doProbes(m libkb.MetaContext, probes map[keybase1.Seqno]int, probeId int, left keybase1.Seqno, right keybase1.Seqno, n int) (err error) {
-	for len(probes) < n {
-
+func randSeqno(lo keybase1.Seqno, hi keybase1.Seqno) (keybase1.Seqno, error) {
+	rng := hi - lo + 1
+	rngBig := big.NewInt(int64(rng))
+	n, err := rand.Int(rand.Reader, rngBig)
+	if err != nil {
+		return keybase1.Seqno(0), err
 	}
-	return nil
+	return keybase1.Seqno(n.Int64()), nil
+}
+
+type probePair struct {
+	merkle keybase1.Seqno
+	team   keybase1.Seqno
+}
+
+func (a *Auditor) doProbes(m libkb.MetaContext, probes map[keybase1.Seqno]int, probeId int, left keybase1.Seqno, right keybase1.Seqno, n int) (ret []probePair, err error) {
+	if len(probes) > n {
+		m.CDebugf("no more probes needed; did %d, wanted %d", len(probes), n)
+		return nil, nil
+	}
+	rng := right - left
+	if int(rng) <= len(probes) {
+		m.CDebugf("no more probes needed; range was only %d, and we did %d", rng, len(probes))
+		return nil, nil
+	}
+	for i := 0; i < n; i++ {
+		x, err := randSeqno(left, right)
+		if err != nil {
+			return nil, err
+		}
+		if _, found := probes[x]; !found {
+			ret = append(ret, probePair{merkle: x})
+			probes[x] = probeId
+		}
+	}
+	return ret, nil
 }
 
 func (a *Auditor) auditLocked(m libkb.MetaContext, id keybase1.TeamID, headMerkle keybase1.MerkleRootV2, chain map[keybase1.Seqno]keybase1.LinkID, maxChainSeqno keybase1.Seqno) (err error) {
