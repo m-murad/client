@@ -553,7 +553,6 @@ func MakeSig(
 	case KeybaseSignatureV2:
 		prevSeqno := me.GetSigChainLastKnownSeqno()
 		prevLinkID := me.GetSigChainLastKnownID()
-		// TODO: i think this should be nil using a pointer
 		hPrev := NewRootHPrevInfo()
 		sig, sigID, linkID, err = MakeSigchainV2OuterSig(
 			signingKey,
